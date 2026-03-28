@@ -10,6 +10,13 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
+  // 結合テストと E2E テストはそれぞれ専用 config で実行するため除外
+  testPathIgnorePatterns: [
+    "/node_modules/",
+    "/.next/",
+    "/src/__tests__/integration/",
+    "/e2e/",
+  ],
   collectCoverageFrom: [
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
