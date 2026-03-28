@@ -78,22 +78,16 @@ AI Design Studio (Next.js, port 3700)
 | `seed` | integer | — | -1〜2147483647 | シード値（-1=ランダム） |
 | `templateId` | string | — | — | 適用したテンプレートID（記録用） |
 
-**レスポンス（202 Accepted）**
+**レスポンス（202 Accepted）— 非同期即返却**
 
 ```json
 {
   "success": true,
-  "generationId": "gen_01HXYZ123",
-  "promptId": "a3f2c1d4-...",
-  "images": [
-    {
-      "filename": "ComfyUI_00001_.png",
-      "subfolder": "",
-      "type": "output",
-      "url": "/api/images/ComfyUI_00001_.png"
-    }
-  ],
-  "executionTime": 3421
+  "data": {
+    "generationId": "gen_01HXYZ123",
+    "promptId": "gen_01HXYZ123",
+    "status": "queued"
+  }
 }
 ```
 
@@ -132,10 +126,13 @@ Connection: keep-alive
 data: {"step": 2, "totalSteps": 4, "progress": 50}
 ```
 
-完了:
+完了（画像URL付き）:
 ```
-data: {"progress": 100, "done": true}
+data: {"progress": 100, "done": true, "imageUrl": "/api/images/ComfyUI_00001_.png"}
 ```
+
+備考: `generationId` = `promptId`（同一ID）。クライアントは POST /api/generate の
+レスポンスで取得した `generationId` を使って SSE に接続する。
 
 エラー:
 ```
