@@ -1,0 +1,19 @@
+:80 {
+    reverse_proxy app:3700 {
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # SSE: disable buffering
+    @sse path /api/progress/*
+    header @sse X-Accel-Buffering no
+
+    encode gzip
+
+    log {
+        output stdout
+        format console
+    }
+}
