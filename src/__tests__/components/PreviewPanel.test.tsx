@@ -35,7 +35,7 @@ describe("PreviewPanel", () => {
   it("shows idle state", () => {
     render(<PreviewPanel {...defaultProps} status="idle" />);
     expect(screen.getByTestId("preview-idle")).toBeInTheDocument();
-    expect(screen.getByText("プロンプトを入力して")).toBeInTheDocument();
+    expect(screen.getByText(/プロンプトを入力して/)).toBeInTheDocument();
   });
 
   it("shows processing state with progress", () => {

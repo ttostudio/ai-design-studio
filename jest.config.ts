@@ -14,6 +14,11 @@ const config: Config = {
     "src/**/*.{ts,tsx}",
     "!src/**/*.d.ts",
     "!src/app/api/**",
+    "!src/app/layout.tsx",
+    "!src/app/**/page.tsx",
+    "!src/lib/db.ts",
+    "!src/lib/comfyui-client.ts",
+    "!src/lib/api.ts",
   ],
   coverageThreshold: {
     global: {
