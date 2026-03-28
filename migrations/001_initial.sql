@@ -14,9 +14,11 @@ CREATE TABLE IF NOT EXISTS generations (
   image_filename  TEXT,
   image_subfolder TEXT        NOT NULL DEFAULT '',
   execution_time  INTEGER,
-  status          TEXT        NOT NULL CHECK (status IN ('success', 'error')),
+  status          TEXT        NOT NULL DEFAULT 'queued'
+                  CHECK (status IN ('queued', 'processing', 'success', 'error')),
   error_message   TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  completed_at    TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_generations_created_at  ON generations (created_at DESC);

@@ -25,14 +25,14 @@ export interface GenerationRow {
   image_filename: string | null;
   image_subfolder: string;
   execution_time: number | null;
-  status: "success" | "error";
+  status: "queued" | "processing" | "success" | "error";
   error_message: string | null;
   created_at: string;
+  completed_at: string | null;
 }
 
 export interface InsertGenerationData {
   id: string;
-  promptId?: string;
   prompt: string;
   negativePrompt?: string;
   workflow: string;
@@ -42,12 +42,15 @@ export interface InsertGenerationData {
   cfgScale: number;
   seed: number;
   templateId?: string;
+}
+
+export interface CompleteGenerationData {
+  promptId?: string;
   imageUrl?: string;
   imageFilename?: string;
   imageSubfolder?: string;
   executionTime?: number;
-  status: "success" | "error";
-  errorMessage?: string;
+  seed?: number;
 }
 
 export interface ListOptions {
@@ -63,12 +66,11 @@ export interface ListOptions {
 export async function insertGeneration(data: InsertGenerationData): Promise<void> {
   await pool.query(
     `INSERT INTO generations
-     (id, prompt_id, prompt, negative_prompt, workflow, width, height, steps, cfg_scale, seed,
-      template_id, image_url, image_filename, image_subfolder, execution_time, status, error_message)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+     (id, prompt, negative_prompt, workflow, width, height, steps, cfg_scale, seed,
+      template_id, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'queued')`,
     [
       data.id,
-      data.promptId ?? null,
       data.prompt,
       data.negativePrompt ?? null,
       data.workflow,
@@ -78,13 +80,48 @@ export async function insertGeneration(data: InsertGenerationData): Promise<void
       data.cfgScale,
       data.seed,
       data.templateId ?? null,
+    ]
+  );
+}
+
+export async function updateGenerationProcessing(id: string): Promise<void> {
+  await pool.query(
+    "UPDATE generations SET status = 'processing' WHERE id = $1",
+    [id]
+  );
+}
+
+export async function updateGenerationComplete(
+  id: string,
+  data: CompleteGenerationData
+): Promise<void> {
+  await pool.query(
+    `UPDATE generations
+     SET status = 'success',
+         prompt_id = $2,
+         image_url = $3,
+         image_filename = $4,
+         image_subfolder = $5,
+         execution_time = $6,
+         seed = COALESCE($7, seed),
+         completed_at = NOW()
+     WHERE id = $1`,
+    [
+      id,
+      data.promptId ?? null,
       data.imageUrl ?? null,
       data.imageFilename ?? null,
       data.imageSubfolder ?? "",
       data.executionTime ?? null,
-      data.status,
-      data.errorMessage ?? null,
+      data.seed ?? null,
     ]
+  );
+}
+
+export async function updateGenerationError(id: string, errorMessage: string): Promise<void> {
+  await pool.query(
+    "UPDATE generations SET status = 'error', error_message = $2, completed_at = NOW() WHERE id = $1",
+    [id, errorMessage]
   );
 }
 
@@ -106,7 +143,7 @@ export async function getGenerationByPromptId(promptId: string): Promise<Generat
 
 export async function listGenerations(opts: ListOptions): Promise<GenerationRow[]> {
   const params: unknown[] = [];
-  const conditions: string[] = ["status = 'success'", "image_url IS NOT NULL"];
+  const conditions: string[] = ["status IN ('success')", "image_url IS NOT NULL"];
 
   if (opts.workflow) {
     params.push(opts.workflow);

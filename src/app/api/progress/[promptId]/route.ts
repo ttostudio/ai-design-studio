@@ -1,114 +1,73 @@
 import { NextRequest } from "next/server";
-import { getGenerationByPromptId } from "@/lib/db";
-
-const COMFYUI_API_URL =
-  process.env["COMFYUI_API_URL"] ?? "http://comfyui-api:3300";
+import { getGenerationById } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
+
+const POLL_INTERVAL_MS = 1_000;
+const TIMEOUT_MS = 330_000;
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ promptId: string }> }
 ) {
-  const { promptId } = await params;
-
+  // promptId === generationId in async design
+  const { promptId: generationId } = await params;
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
       const send = (data: unknown) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        } catch {
+          // controller may already be closed
+        }
       };
 
-      // Check if generation is already complete in DB
-      const existing = await getGenerationByPromptId(promptId).catch(() => null);
-      if (existing && existing.status === "success" && existing.image_url) {
-        send({ progress: 100 });
-        send({ imageUrl: existing.image_url, status: "complete" });
-        controller.close();
-        return;
-      }
-      if (existing && existing.status === "error") {
-        send({ status: "error", error: existing.error_message ?? "生成に失敗しました" });
-        controller.close();
-        return;
-      }
+      const startTime = Date.now();
+      let closed = false;
 
-      // Proxy ComfyUI SSE stream
-      let upstream: Response;
-      try {
-        upstream = await fetch(`${COMFYUI_API_URL}/api/progress/${promptId}`, {
-          signal: AbortSignal.timeout(310_000),
-        });
-      } catch {
-        send({ status: "error", error: "ComfyUI APIへの接続に失敗しました" });
-        controller.close();
-        return;
-      }
+      req.signal.addEventListener("abort", () => {
+        closed = true;
+        try { controller.close(); } catch { /* already closed */ }
+      });
 
-      if (!upstream.ok || !upstream.body) {
-        send({ status: "error", error: "進捗ストリームの取得に失敗しました" });
-        controller.close();
-        return;
-      }
-
-      const reader = upstream.body.getReader();
-      const textDecoder = new TextDecoder();
-      let buffer = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += textDecoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const raw = line.slice(6);
-            let event: Record<string, unknown>;
-            try {
-              event = JSON.parse(raw) as Record<string, unknown>;
-            } catch {
-              continue;
-            }
-
-            if (event["error"]) {
-              send({ status: "error", error: event["error"] });
-              controller.close();
-              return;
-            }
-
-            if (typeof event["progress"] === "number") {
-              send({ progress: event["progress"] });
-            }
-
-            if (event["done"] === true) {
-              // ComfyUI reports done — fetch image info from DB (should be saved by now)
-              send({ progress: 100 });
-              const gen = await getGenerationByPromptId(promptId).catch(() => null);
-              if (gen?.image_url) {
-                send({ imageUrl: gen.image_url, status: "complete" });
-              } else {
-                send({ status: "complete" });
-              }
-              controller.close();
-              return;
-            }
-          }
+      while (!closed) {
+        if (Date.now() - startTime > TIMEOUT_MS) {
+          send({ status: "error", error: "生成タイムアウト" });
+          break;
         }
-      } catch {
-        // stream closed by client or network error
-      } finally {
-        reader.cancel().catch(() => {});
+
+        let row: Awaited<ReturnType<typeof getGenerationById>> = null;
+        try {
+          row = await getGenerationById(generationId);
+        } catch {
+          // DB error — retry next tick
+        }
+
+        if (row?.status === "queued") {
+          send({ progress: 0 });
+        } else if (row?.status === "processing") {
+          // Approximate progress: increases over time (max 90 until complete)
+          const elapsed = Date.now() - startTime;
+          const approx = Math.min(90, Math.round((elapsed / TIMEOUT_MS) * 100 * 3));
+          send({ progress: approx });
+        } else if (row?.status === "success" && row.image_url) {
+          send({ progress: 100 });
+          send({ imageUrl: row.image_url, status: "complete" });
+          break;
+        } else if (row?.status === "error") {
+          send({ status: "error", error: row.error_message ?? "生成に失敗しました" });
+          break;
+        }
+
+        await new Promise<void>((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       }
 
-      controller.close();
+      try { controller.close(); } catch { /* already closed */ }
     },
     cancel() {
-      // nothing to clean up
+      // cleaned up via req.signal
     },
   });
 

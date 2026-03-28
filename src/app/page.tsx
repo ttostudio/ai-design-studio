@@ -9,6 +9,7 @@ import { ParamsPanel } from "@/components/ParamsPanel";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { useGeneration } from "@/hooks/useGeneration";
 import { getStatus } from "@/lib/api";
+import { getTemplate } from "@/lib/templates";
 import type { Template } from "@/lib/templates";
 
 function HomeContent() {
@@ -45,7 +46,7 @@ function HomeContent() {
     return () => clearInterval(id);
   }, []);
 
-  // Apply URL params on mount (for "reuse prompt" flow)
+  // Apply URL params on mount (for "reuse prompt" and template selection flows)
   useEffect(() => {
     const p = searchParams.get("prompt");
     const w = searchParams.get("workflow");
@@ -54,6 +55,20 @@ function HomeContent() {
     const sp = searchParams.get("steps");
     const sd = searchParams.get("seed");
     const np = searchParams.get("negativePrompt");
+    const tid = searchParams.get("templateId");
+
+    // Apply template preset first (from templates page)
+    if (tid) {
+      const tpl = getTemplate(tid);
+      if (tpl) {
+        setSelectedTemplate(tpl);
+        setWorkflow(tpl.workflow);
+        setWidth(tpl.width);
+        setHeight(tpl.height);
+        setSteps(tpl.steps);
+        if (!p) setPrompt(tpl.promptPrefix);
+      }
+    }
 
     if (p) setPrompt(p);
     if (w === "flux-gguf" || w === "sd15") setWorkflow(w);

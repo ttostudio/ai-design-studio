@@ -1,11 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { validateGenerateInput } from "@/lib/validators";
-import { generateImage, ComfyUIProxyError } from "@/lib/comfyui-client";
-import { insertGeneration } from "@/lib/db";
+import { generateImage } from "@/lib/comfyui-client";
+import {
+  insertGeneration,
+  updateGenerationProcessing,
+  updateGenerationComplete,
+  updateGenerationError,
+} from "@/lib/db";
 import { getTemplate } from "@/lib/templates";
+import type { GenerateInput } from "@/lib/validators";
 
-export const maxDuration = 310;
+// Fire-and-forget background generation task
+async function backgroundGenerate(
+  generationId: string,
+  params: Required<Pick<GenerateInput, "prompt" | "workflow">> & {
+    negativePrompt?: string;
+    width: number;
+    height: number;
+    steps: number;
+    cfgScale: number;
+    seed: number;
+    templateId?: string;
+  }
+): Promise<void> {
+  try {
+    await updateGenerationProcessing(generationId);
+    const result = await generateImage(params);
+
+    const firstImage = result.images?.[0];
+    const imageFilename = firstImage?.filename;
+    const imageSubfolder = firstImage?.subfolder ?? "";
+    const imageUrl = imageFilename
+      ? `/api/images/${encodeURIComponent(imageFilename)}?subfolder=${encodeURIComponent(imageSubfolder)}`
+      : undefined;
+
+    await updateGenerationComplete(generationId, {
+      promptId: result.promptId,
+      imageUrl,
+      imageFilename,
+      imageSubfolder,
+      executionTime: result.executionTime,
+      seed: result.seed,
+    });
+  } catch (err) {
+    await updateGenerationError(
+      generationId,
+      err instanceof Error ? err.message : "生成中にエラーが発生しました"
+    ).catch(() => {});
+  }
+}
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -25,7 +69,7 @@ export async function POST(req: NextRequest) {
 
   const input = validation.value;
 
-  // Apply template defaults if templateId is provided
+  // Apply template defaults
   if (input.templateId) {
     const tpl = getTemplate(input.templateId);
     if (!tpl) {
@@ -55,50 +99,8 @@ export async function POST(req: NextRequest) {
     templateId: input.templateId,
   };
 
+  // Save queued record to DB
   try {
-    const result = await generateImage(params);
-
-    const firstImage = result.images?.[0];
-    const imageFilename = firstImage?.filename;
-    const imageSubfolder = firstImage?.subfolder ?? "";
-    const imageUrl = imageFilename
-      ? `/api/images/${encodeURIComponent(imageFilename)}?subfolder=${encodeURIComponent(imageSubfolder)}`
-      : undefined;
-
-    await insertGeneration({
-      id: generationId,
-      promptId: result.promptId,
-      prompt: params.prompt,
-      negativePrompt: params.negativePrompt,
-      workflow: params.workflow,
-      width: params.width,
-      height: params.height,
-      steps: params.steps,
-      cfgScale: params.cfgScale,
-      seed: result.seed ?? params.seed,
-      templateId: params.templateId,
-      imageUrl,
-      imageFilename,
-      imageSubfolder,
-      executionTime: result.executionTime,
-      status: "success",
-    });
-
-    return NextResponse.json({
-      data: { generationId, promptId: result.promptId },
-    });
-  } catch (err) {
-    let message = "生成中にエラーが発生しました";
-    let status = 500;
-    let code = "INTERNAL_ERROR";
-
-    if (err instanceof ComfyUIProxyError) {
-      message = `ComfyUI APIエラー: ${err.message}`;
-      status = err.status >= 500 ? 503 : 400;
-      code = "COMFYUI_ERROR";
-    }
-
-    // Best-effort DB save for error record
     await insertGeneration({
       id: generationId,
       prompt: params.prompt,
@@ -110,10 +112,20 @@ export async function POST(req: NextRequest) {
       cfgScale: params.cfgScale,
       seed: params.seed,
       templateId: params.templateId,
-      status: "error",
-      errorMessage: err instanceof Error ? err.message : String(err),
-    }).catch(() => {});
-
-    return NextResponse.json({ error: { code, message } }, { status });
+    });
+  } catch (err) {
+    console.error("[generate] DB insert error:", err);
+    return NextResponse.json(
+      { error: { code: "INTERNAL_ERROR", message: "ジョブの登録に失敗しました" } },
+      { status: 500 }
+    );
   }
+
+  // Fire and forget — background generation task
+  void backgroundGenerate(generationId, params);
+
+  // Return immediately with queued status
+  return NextResponse.json({
+    data: { generationId, promptId: generationId, status: "queued" },
+  });
 }
