@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { TemplateSelector } from "@/components/TemplateSelector";
 import { WorkflowSelector } from "@/components/WorkflowSelector";
@@ -11,7 +11,7 @@ import { useGeneration } from "@/hooks/useGeneration";
 import { getStatus } from "@/lib/api";
 import type { Template } from "@/lib/templates";
 
-export default function HomePage() {
+function HomeContent() {
   const searchParams = useSearchParams();
   const { state, generate, reset } = useGeneration();
 
@@ -49,19 +49,19 @@ export default function HomePage() {
   useEffect(() => {
     const p = searchParams.get("prompt");
     const w = searchParams.get("workflow");
-    const width = searchParams.get("width");
-    const height = searchParams.get("height");
-    const steps = searchParams.get("steps");
-    const seed = searchParams.get("seed");
-    const negativePrompt = searchParams.get("negativePrompt");
+    const wp = searchParams.get("width");
+    const hp = searchParams.get("height");
+    const sp = searchParams.get("steps");
+    const sd = searchParams.get("seed");
+    const np = searchParams.get("negativePrompt");
 
     if (p) setPrompt(p);
     if (w === "flux-gguf" || w === "sd15") setWorkflow(w);
-    if (width) setWidth(Number(width));
-    if (height) setHeight(Number(height));
-    if (steps) setSteps(Number(steps));
-    if (seed) setSeed(seed);
-    if (negativePrompt) setNegativePrompt(negativePrompt);
+    if (wp) setWidth(Number(wp));
+    if (hp) setHeight(Number(hp));
+    if (sp) setSteps(Number(sp));
+    if (sd) setSeed(sd);
+    if (np) setNegativePrompt(np);
   }, [searchParams]);
 
   const handleTemplateChange = useCallback((template: Template | null) => {
@@ -84,9 +84,10 @@ export default function HomePage() {
   }, []);
 
   const handleGenerate = () => {
-    const fullPrompt = selectedTemplate
-      ? (prompt.startsWith(selectedTemplate.promptPrefix) ? prompt : selectedTemplate.promptPrefix + prompt)
-      : prompt;
+    const fullPrompt =
+      selectedTemplate && !prompt.startsWith(selectedTemplate.promptPrefix)
+        ? selectedTemplate.promptPrefix + prompt
+        : prompt;
 
     generate({
       prompt: fullPrompt,
@@ -102,9 +103,9 @@ export default function HomePage() {
   };
 
   const isGenerating = state.status === "queued" || state.status === "processing";
-  const canGenerate = !isGenerating && isOnline && prompt.trim().length > 0 && prompt.length <= 1000;
+  const canGenerate =
+    !isGenerating && isOnline && prompt.trim().length > 0 && prompt.length <= 1000;
 
-  // Status bar message
   const statusMessage = (() => {
     switch (state.status) {
       case "idle": return "準備完了";
@@ -115,12 +116,10 @@ export default function HomePage() {
     }
   })();
 
-  const promptPrefix = selectedTemplate?.promptPrefix ?? null;
-
   return (
     <div
       data-testid="home-page"
-      className="flex flex-col h-full"
+      className="flex flex-col"
       style={{ minHeight: "calc(100vh - 56px)" }}
     >
       {/* Main content */}
@@ -151,7 +150,7 @@ export default function HomePage() {
             negativePrompt={negativePrompt}
             onNegativePromptChange={setNegativePrompt}
             showNegative={workflow === "sd15"}
-            promptPrefix={promptPrefix}
+            promptPrefix={selectedTemplate?.promptPrefix ?? null}
             disabled={isGenerating}
           />
 
@@ -175,9 +174,11 @@ export default function HomePage() {
             onClick={handleGenerate}
             disabled={!canGenerate}
             aria-label={
-              !isOnline ? "ComfyUI オフライン" :
-              isGenerating ? "生成中..." :
-              "画像を生成"
+              !isOnline
+                ? "ComfyUI オフライン"
+                : isGenerating
+                  ? "生成中..."
+                  : "画像を生成"
             }
             className="w-full py-3 rounded font-medium text-sm transition-colors flex items-center justify-center gap-2"
             style={{
@@ -210,7 +211,11 @@ export default function HomePage() {
                 <path d="M12 2a10 10 0 0 1 10 10" />
               </svg>
             )}
-            {!isOnline ? "ComfyUI オフライン" : isGenerating ? "生成中..." : "画像を生成"}
+            {!isOnline
+              ? "ComfyUI オフライン"
+              : isGenerating
+                ? "生成中..."
+                : "画像を生成"}
           </button>
         </div>
 
@@ -241,11 +246,12 @@ export default function HomePage() {
         style={{
           backgroundColor: "var(--color-bg-surface)",
           borderTop: "1px solid var(--color-border)",
-          color: state.status === "error"
-            ? "var(--color-error)"
-            : state.status === "complete"
-              ? "var(--color-success)"
-              : "var(--color-text-secondary)",
+          color:
+            state.status === "error"
+              ? "var(--color-error)"
+              : state.status === "complete"
+                ? "var(--color-success)"
+                : "var(--color-text-secondary)",
         }}
         aria-live="polite"
         aria-label="生成ステータス"
@@ -253,5 +259,22 @@ export default function HomePage() {
         {statusMessage}
       </div>
     </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div
+          className="flex items-center justify-center"
+          style={{ minHeight: "calc(100vh - 56px)", color: "var(--color-text-secondary)" }}
+        >
+          読み込み中...
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }
