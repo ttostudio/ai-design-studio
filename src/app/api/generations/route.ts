@@ -11,9 +11,24 @@ export async function GET(req: NextRequest) {
   const sort = sp.get("sort") as "newest" | "oldest" | undefined;
   const limit = Math.min(Number(sp.get("limit") ?? "20"), 100);
   const offset = Math.max(Number(sp.get("offset") ?? "0"), 0);
+  const tagsParam = sp.get("tags");
+  const tags = tagsParam ? tagsParam.split(",").filter(Boolean) : undefined;
+  const statusParam = sp.get("status") as "success" | "error" | "all" | undefined;
+  const isFavorite = sp.get("isFavorite") === "1" ? true : undefined;
 
   try {
-    const items = await listGenerations({ workflow, templateId, search, dateFilter, sort, limit, offset });
+    const items = await listGenerations({
+      workflow,
+      templateId,
+      search,
+      dateFilter,
+      sort,
+      limit,
+      offset,
+      tags,
+      status: statusParam,
+      isFavorite,
+    });
     return NextResponse.json({ data: { items, total: items.length } });
   } catch (err) {
     console.error("[generations] listGenerations error:", err);

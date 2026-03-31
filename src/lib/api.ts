@@ -32,6 +32,8 @@ export interface Generation {
   execution_time: number | null;
   status: "success" | "error";
   created_at: string;
+  tags: string[];
+  is_favorite: boolean;
 }
 
 export interface StatusResponse {
@@ -67,6 +69,9 @@ export async function listGenerations(params?: {
   sort?: string;
   limit?: number;
   offset?: number;
+  tags?: string[];
+  status?: string;
+  isFavorite?: boolean;
 }): Promise<Generation[]> {
   const query = new URLSearchParams();
   if (params?.workflow) query.set("workflow", params.workflow);
@@ -76,15 +81,36 @@ export async function listGenerations(params?: {
   if (params?.sort) query.set("sort", params.sort);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.offset) query.set("offset", String(params.offset));
+  if (params?.tags && params.tags.length > 0) query.set("tags", params.tags.join(","));
+  if (params?.status) query.set("status", params.status);
+  if (params?.isFavorite) query.set("isFavorite", "1");
 
   const res = await fetch(`/api/generations?${query.toString()}`, { cache: "no-store" });
   const json = await res.json() as { data?: { items: Generation[] } };
   return json.data?.items ?? [];
 }
 
-export async function getGeneration(id: string): Promise<Generation | null> {
+export async function getGeneration(id: string): Promise<{ generation: Generation; similar: Generation[] } | null> {
   const res = await fetch(`/api/generations/${id}`, { cache: "no-store" });
   if (!res.ok) return null;
-  const json = await res.json() as { data?: Generation };
+  const json = await res.json() as { data?: { generation: Generation; similar: Generation[] } };
   return json.data ?? null;
+}
+
+export async function toggleFavorite(id: string, isFavorite: boolean): Promise<void> {
+  const res = await fetch(`/api/generations/${id}/favorite`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ isFavorite }),
+  });
+  if (!res.ok) throw new Error("favorite update failed");
+}
+
+export async function updateTags(id: string, tags: string[]): Promise<void> {
+  const res = await fetch(`/api/generations/${id}/tags`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tags }),
+  });
+  if (!res.ok) throw new Error("tags update failed");
 }

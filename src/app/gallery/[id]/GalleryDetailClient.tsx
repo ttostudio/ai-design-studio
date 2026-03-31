@@ -1,14 +1,16 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toggleFavorite } from "@/lib/api";
+import { SimilarDesigns } from "@/components/SimilarDesigns";
 import type { Generation } from "@/lib/api";
 
 interface Props {
   generation: Generation;
-  onClose: () => void;
+  similar: Generation[];
 }
 
 function formatDate(iso: string): string {
@@ -22,6 +24,11 @@ function formatDate(iso: string): string {
   });
 }
 
+const WORKFLOW_LABELS: Record<string, string> = {
+  "flux-gguf": "Flux-schnell",
+  "sd15": "SD1.5",
+};
+
 const TEMPLATE_LABELS: Record<string, string> = {
   "blog-thumbnail": "ブログサムネイル",
   "sns-post": "SNS投稿画像",
@@ -29,12 +36,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
   "illustration": "イラスト",
 };
 
-const WORKFLOW_LABELS: Record<string, string> = {
-  "flux-gguf": "Flux-schnell",
-  "sd15": "SD1.5",
-};
-
-export function ImageDetailModal({ generation: gen, onClose }: Props) {
+export function GalleryDetailClient({ generation: gen, similar }: Props) {
   const router = useRouter();
   const [isFav, setIsFav] = useState(gen.is_favorite);
 
@@ -48,22 +50,7 @@ export function ImageDetailModal({ generation: gen, onClose }: Props) {
     }
   };
 
-  // Close on Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  // Prevent body scroll
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, []);
-
-  const handleReusePrompt = () => {
+  const handleRegenerate = () => {
     const params = new URLSearchParams({
       prompt: gen.prompt,
       workflow: gen.workflow,
@@ -85,57 +72,35 @@ export function ImageDetailModal({ generation: gen, onClose }: Props) {
     a.click();
   };
 
-  return (
-    <div
-      data-testid="image-detail-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.8)" }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div
-        data-testid="image-detail-modal"
-        className="relative flex w-full max-w-4xl rounded-lg overflow-hidden flex-col md:flex-row"
-        style={{
-          backgroundColor: "var(--color-bg-surface)",
-          border: "1px solid var(--color-border)",
-          maxHeight: "90vh",
-        }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="生成詳細"
-      >
-        {/* Close button */}
-        <button
-          data-testid="modal-close-btn"
-          onClick={onClose}
-          aria-label="閉じる"
-          className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded"
-          style={{
-            backgroundColor: "var(--color-bg-elevated)",
-            color: "var(--color-text-secondary)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          ✕
-        </button>
+  const aspectRatio = `${gen.width} / ${gen.height}`;
 
+  return (
+    <div className="min-h-screen p-6 flex flex-col gap-8" style={{ color: "var(--color-text-primary)" }}>
+      {/* Back link */}
+      <div>
+        <Link
+          href="/gallery"
+          className="text-sm"
+          style={{ color: "var(--color-text-secondary)" }}
+        >
+          ← ギャラリーに戻る
+        </Link>
+      </div>
+
+      {/* Main content */}
+      <div className="flex flex-col md:flex-row gap-6">
         {/* Image */}
         <div
-          className="flex-1 flex items-center justify-center"
+          className="flex-1 flex items-center justify-center rounded-lg overflow-hidden"
           style={{
-            backgroundColor: "var(--color-bg-primary)",
-            minHeight: "200px",
-            maxHeight: "60vh",
-            position: "relative",
+            backgroundColor: "var(--color-bg-surface)",
+            border: "1px solid var(--color-border)",
+            minHeight: "300px",
           }}
         >
           {gen.image_url ? (
-            <div
-              className="relative w-full h-full"
-              style={{ minHeight: "200px" }}
-            >
+            <div className="relative w-full" style={{ aspectRatio }}>
               <Image
-                data-testid="modal-image"
                 src={gen.image_url}
                 alt={gen.prompt.slice(0, 100)}
                 fill
@@ -150,19 +115,17 @@ export function ImageDetailModal({ generation: gen, onClose }: Props) {
 
         {/* Details */}
         <div
-          data-testid="modal-details"
-          className="w-full md:w-72 flex flex-col gap-4 p-5 overflow-y-auto"
-          style={{ borderLeft: "1px solid var(--color-border)" }}
+          className="w-full md:w-72 flex flex-col gap-4 p-5 rounded-lg"
+          style={{
+            backgroundColor: "var(--color-bg-surface)",
+            border: "1px solid var(--color-border)",
+          }}
         >
-          <div className="flex items-center justify-between pr-8">
-            <h2
-              className="font-semibold text-base"
-              style={{ color: "var(--color-text-primary)" }}
-            >
+          <div className="flex items-center justify-between">
+            <h1 className="font-semibold text-base" style={{ color: "var(--color-text-primary)" }}>
               生成詳細
-            </h2>
+            </h1>
             <button
-              data-testid="modal-favorite-btn"
               onClick={handleFavoriteToggle}
               aria-label={isFav ? "お気に入りから削除" : "お気に入りに追加"}
               aria-pressed={isFav}
@@ -181,46 +144,52 @@ export function ImageDetailModal({ generation: gen, onClose }: Props) {
           </div>
 
           <dl className="flex flex-col gap-2 text-sm">
+            <div>
+              <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>ワークフロー</dt>
+              <dd>{WORKFLOW_LABELS[gen.workflow] ?? gen.workflow}</dd>
+            </div>
             {gen.template_id && (
               <div>
                 <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>テンプレート</dt>
-                <dd style={{ color: "var(--color-text-primary)" }}>
-                  {TEMPLATE_LABELS[gen.template_id] ?? gen.template_id}
-                </dd>
+                <dd>{TEMPLATE_LABELS[gen.template_id] ?? gen.template_id}</dd>
               </div>
             )}
             <div>
-              <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>ワークフロー</dt>
-              <dd style={{ color: "var(--color-text-primary)" }}>
-                {WORKFLOW_LABELS[gen.workflow] ?? gen.workflow}
-              </dd>
-            </div>
-            <div>
               <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>サイズ</dt>
-              <dd style={{ color: "var(--color-text-primary)" }}>{gen.width} × {gen.height}</dd>
+              <dd>{gen.width} × {gen.height}</dd>
             </div>
             <div>
               <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>ステップ</dt>
-              <dd style={{ color: "var(--color-text-primary)" }}>{gen.steps}</dd>
+              <dd>{gen.steps}</dd>
+            </div>
+            <div>
+              <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>CFGスケール</dt>
+              <dd>{gen.cfg_scale}</dd>
             </div>
             <div>
               <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>シード</dt>
-              <dd className="font-mono text-xs" style={{ color: "var(--color-text-primary)" }}>{gen.seed}</dd>
+              <dd className="font-mono text-xs">{gen.seed}</dd>
+            </div>
+            {gen.execution_time !== null && (
+              <div>
+                <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>生成時間</dt>
+                <dd>{gen.execution_time} ms</dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-xs" style={{ color: "var(--color-text-secondary)" }}>生成日時</dt>
+              <dd className="text-xs">{formatDate(gen.created_at)}</dd>
             </div>
           </dl>
 
-          {/* Divider */}
           <div style={{ borderTop: "1px solid var(--color-border)" }} />
 
-          {/* Prompt */}
           <div className="flex flex-col gap-2">
             <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>プロンプト</span>
             <div
-              data-testid="modal-prompt"
               className="p-2 rounded text-xs break-words"
               style={{
                 backgroundColor: "var(--color-bg-elevated)",
-                color: "var(--color-text-primary)",
                 border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-sm)",
                 maxHeight: "120px",
@@ -229,44 +198,75 @@ export function ImageDetailModal({ generation: gen, onClose }: Props) {
             >
               {gen.prompt}
             </div>
+            {gen.negative_prompt && (
+              <>
+                <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>ネガティブプロンプト</span>
+                <div
+                  className="p-2 rounded text-xs break-words"
+                  style={{
+                    backgroundColor: "var(--color-bg-elevated)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-sm)",
+                    maxHeight: "80px",
+                    overflowY: "auto",
+                  }}
+                >
+                  {gen.negative_prompt}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Actions */}
+          {gen.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {gen.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-xs px-2 py-0.5 rounded"
+                  style={{
+                    backgroundColor: "var(--color-accent-muted)",
+                    color: "var(--color-accent)",
+                  }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-col gap-2 mt-auto">
             <button
-              data-testid="modal-reuse-btn"
-              onClick={handleReusePrompt}
-              className="w-full py-2 px-4 rounded text-sm font-medium transition-colors"
+              onClick={handleRegenerate}
+              className="w-full py-2 px-4 rounded text-sm font-medium"
               style={{
                 backgroundColor: "var(--color-accent)",
                 color: "#fff",
                 borderRadius: "var(--radius-sm)",
+                border: "none",
+                cursor: "pointer",
               }}
             >
-              プロンプトを再利用
+              再生成
             </button>
             <button
-              data-testid="modal-download-btn"
               onClick={handleDownload}
-              className="w-full py-2 px-4 rounded text-sm transition-colors"
+              className="w-full py-2 px-4 rounded text-sm"
               style={{
                 backgroundColor: "var(--color-bg-elevated)",
                 color: "var(--color-text-primary)",
                 border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-sm)",
+                cursor: "pointer",
               }}
             >
               ダウンロード
             </button>
-            <span
-              className="text-center text-xs"
-              style={{ color: "var(--color-text-secondary)" }}
-            >
-              生成日時: {formatDate(gen.created_at)}
-            </span>
           </div>
         </div>
       </div>
+
+      {/* Similar designs */}
+      {similar.length > 0 && <SimilarDesigns generations={similar} />}
     </div>
   );
 }

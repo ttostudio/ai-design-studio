@@ -26,6 +26,8 @@ const mockGeneration: Generation = {
   execution_time: 5000,
   status: "success",
   created_at: "2026-03-28T10:00:00Z",
+  tags: [],
+  is_favorite: false,
 };
 
 describe("GalleryGrid", () => {
