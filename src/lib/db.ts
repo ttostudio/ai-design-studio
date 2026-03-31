@@ -29,6 +29,8 @@ export interface GenerationRow {
   error_message: string | null;
   created_at: string;
   completed_at: string | null;
+  tags: string[];
+  is_favorite: boolean;
 }
 
 export interface InsertGenerationData {
@@ -61,6 +63,9 @@ export interface ListOptions {
   sort?: "newest" | "oldest";
   limit?: number;
   offset?: number;
+  tags?: string[];
+  status?: "success" | "error" | "all";
+  isFavorite?: boolean;
 }
 
 export async function insertGeneration(data: InsertGenerationData): Promise<void> {
@@ -141,9 +146,34 @@ export async function getGenerationByPromptId(promptId: string): Promise<Generat
   return result.rows[0] ?? null;
 }
 
+export async function updateGenerationFavorite(id: string, isFavorite: boolean): Promise<boolean> {
+  const result = await pool.query(
+    "UPDATE generations SET is_favorite = $2 WHERE id = $1",
+    [id, isFavorite]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
+export async function updateGenerationTags(id: string, tags: string[]): Promise<boolean> {
+  const result = await pool.query(
+    "UPDATE generations SET tags = $2 WHERE id = $1",
+    [id, tags]
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function listGenerations(opts: ListOptions): Promise<GenerationRow[]> {
   const params: unknown[] = [];
-  const conditions: string[] = ["status IN ('success')", "image_url IS NOT NULL"];
+
+  // status フィルタ: デフォルトは success のみ
+  const statusCondition =
+    opts.status === "all"
+      ? "status IN ('success','error')"
+      : opts.status === "error"
+      ? "status = 'error'"
+      : "status = 'success'";
+
+  const conditions: string[] = [statusCondition, "image_url IS NOT NULL"];
 
   if (opts.workflow) {
     params.push(opts.workflow);
@@ -166,6 +196,15 @@ export async function listGenerations(opts: ListOptions): Promise<GenerationRow[
     conditions.push("created_at >= CURRENT_DATE - INTERVAL '7 days'");
   } else if (opts.dateFilter === "month") {
     conditions.push("created_at >= CURRENT_DATE - INTERVAL '30 days'");
+  }
+
+  if (opts.tags && opts.tags.length > 0) {
+    params.push(opts.tags);
+    conditions.push(`tags @> $${params.length}`);
+  }
+
+  if (opts.isFavorite) {
+    conditions.push("is_favorite = TRUE");
   }
 
   const orderBy = opts.sort === "oldest" ? "ASC" : "DESC";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGenerationById, deleteGeneration } from "@/lib/db";
+import { getGenerationById, deleteGeneration, listGenerations } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -15,14 +15,26 @@ export async function GET(
   }
 
   try {
-    const row = await getGenerationById(id);
-    if (!row) {
+    const generation = await getGenerationById(id);
+    if (!generation) {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "指定されたIDの生成結果が見つかりません" } },
         { status: 404 }
       );
     }
-    return NextResponse.json({ data: row });
+
+    let similar: Awaited<ReturnType<typeof listGenerations>> = [];
+    if (generation.template_id) {
+      const candidates = await listGenerations({
+        templateId: generation.template_id,
+        limit: 7,
+        sort: "newest",
+        status: "success",
+      });
+      similar = candidates.filter((g) => g.id !== id).slice(0, 6);
+    }
+
+    return NextResponse.json({ data: { generation, similar } });
   } catch (err) {
     console.error("[generations/id] getGenerationById error:", err);
     return NextResponse.json(

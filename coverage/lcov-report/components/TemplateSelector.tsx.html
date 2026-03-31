@@ -25,14 +25,14 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>52/52</span>
+                <span class='fraction'>72/72</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>16/16</span>
+                <span class='fraction'>18/18</span>
             </div>
         
             
@@ -46,7 +46,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>52/52</span>
+                <span class='fraction'>72/72</span>
             </div>
         
             
@@ -115,7 +115,27 @@
 <a name='L50'></a><a href='#L50'>50</a>
 <a name='L51'></a><a href='#L51'>51</a>
 <a name='L52'></a><a href='#L52'>52</a>
-<a name='L53'></a><a href='#L53'>53</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -148,8 +168,28 @@
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">24x</span>
-<span class="cline-any cline-yes">24x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">36x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-yes">6x</span>
@@ -169,7 +209,7 @@
 <span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">"use client";
 &nbsp;
-import { TEMPLATES } from "@/lib/templates";
+import { TEMPLATES, DEFAULT_TEMPLATE_ID } from "@/lib/templates";
 import type { Template } from "@/lib/templates";
 &nbsp;
 interface Props {
@@ -188,6 +228,7 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
         &lt;button
           data-testid="template-chip-custom"
           onClick={() =&gt; onChange(null)}
+          title="テンプレートを使わずカスタム設定で生成します"
           className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors"
           style={{
             backgroundColor: selectedId === null ? "var(--color-accent)" : "var(--color-bg-elevated)",
@@ -204,6 +245,7 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
             key={template.id}
             data-testid={`template-chip-${template.id}`}
             onClick={() =&gt; onChange(template)}
+            title={template.description}
             className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
               backgroundColor: selectedId === template.id ? "var(--color-accent)" : "var(--color-bg-elevated)",
@@ -213,9 +255,27 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
             }}
           &gt;
             {template.name}
+            {template.id === DEFAULT_TEMPLATE_ID &amp;&amp; selectedId !== template.id &amp;&amp; (
+              &lt;span
+                className="ml-1 text-xs"
+                style={{ color: "var(--color-text-disabled)", fontSize: "0.65rem" }}
+              &gt;
+                ★
+              &lt;/span&gt;
+            )}
           &lt;/button&gt;
         ))}
       &lt;/div&gt;
+      {/* Description of selected template */}
+      {selectedId !== null &amp;&amp; (
+        &lt;p
+          data-testid="template-description"
+          className="text-xs"
+          style={{ color: "var(--color-text-secondary)", lineHeight: "1.4" }}
+        &gt;
+          {TEMPLATES.find((t) =&gt; t.id === selectedId)?.description}
+        &lt;/p&gt;
+      )}
     &lt;/div&gt;
   );
 }
@@ -226,7 +286,7 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T05:55:08.085Z
+                at 2026-03-31T23:11:18.997Z
             </div>
         <script src="../prettify.js"></script>
         <script>
