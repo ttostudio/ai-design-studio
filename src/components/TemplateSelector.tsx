@@ -1,6 +1,6 @@
 "use client";
 
-import { TEMPLATES } from "@/lib/templates";
+import { TEMPLATES, DEFAULT_TEMPLATE_ID } from "@/lib/templates";
 import type { Template } from "@/lib/templates";
 
 interface Props {
@@ -19,6 +19,7 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
         <button
           data-testid="template-chip-custom"
           onClick={() => onChange(null)}
+          title="テンプレートを使わずカスタム設定で生成します"
           className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors"
           style={{
             backgroundColor: selectedId === null ? "var(--color-accent)" : "var(--color-bg-elevated)",
@@ -35,6 +36,7 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
             key={template.id}
             data-testid={`template-chip-${template.id}`}
             onClick={() => onChange(template)}
+            title={template.description}
             className="flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors"
             style={{
               backgroundColor: selectedId === template.id ? "var(--color-accent)" : "var(--color-bg-elevated)",
@@ -44,9 +46,27 @@ export function TemplateSelector({ selectedId, onChange }: Props) {
             }}
           >
             {template.name}
+            {template.id === DEFAULT_TEMPLATE_ID && selectedId !== template.id && (
+              <span
+                className="ml-1 text-xs"
+                style={{ color: "var(--color-text-disabled)", fontSize: "0.65rem" }}
+              >
+                ★
+              </span>
+            )}
           </button>
         ))}
       </div>
+      {/* Description of selected template */}
+      {selectedId !== null && (
+        <p
+          data-testid="template-description"
+          className="text-xs"
+          style={{ color: "var(--color-text-secondary)", lineHeight: "1.4" }}
+        >
+          {TEMPLATES.find((t) => t.id === selectedId)?.description}
+        </p>
+      )}
     </div>
   );
 }

@@ -9,21 +9,22 @@ import { ParamsPanel } from "@/components/ParamsPanel";
 import { PreviewPanel } from "@/components/PreviewPanel";
 import { useGeneration } from "@/hooks/useGeneration";
 import { getStatus } from "@/lib/api";
-import { getTemplate } from "@/lib/templates";
+import { getTemplate, getDefaultTemplate } from "@/lib/templates";
 import type { Template } from "@/lib/templates";
 
 function HomeContent() {
   const searchParams = useSearchParams();
   const { state, generate, reset } = useGeneration();
 
-  // Form state
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [workflow, setWorkflow] = useState<"flux-gguf" | "sd15">("flux-gguf");
-  const [prompt, setPrompt] = useState("");
+  // Form state — default to blog-thumbnail template
+  const defaultTemplate = getDefaultTemplate();
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(defaultTemplate);
+  const [workflow, setWorkflow] = useState<"flux-gguf" | "sd15">(defaultTemplate.workflow);
+  const [prompt, setPrompt] = useState(defaultTemplate.promptPrefix);
   const [negativePrompt, setNegativePrompt] = useState("");
-  const [width, setWidth] = useState(1024);
-  const [height, setHeight] = useState(576);
-  const [steps, setSteps] = useState(4);
+  const [width, setWidth] = useState(defaultTemplate.width);
+  const [height, setHeight] = useState(defaultTemplate.height);
+  const [steps, setSteps] = useState(defaultTemplate.steps);
   const [seed, setSeed] = useState("");
   const [paramsCollapsed, setParamsCollapsed] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
