@@ -1,7 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { ProgressBar } from "./ProgressBar";
+import {
+  downloadImageWithResolution,
+  downloadMetadataFromPreview,
+  type PreviewMetadata,
+} from "@/lib/exportUtils";
 import type { GenerationStatus } from "@/hooks/useGeneration";
 
 interface Props {
@@ -13,6 +19,7 @@ interface Props {
   height: number;
   prompt: string;
   generationId: string | null;
+  generationParams?: Omit<PreviewMetadata, "generationId" | "prompt" | "width" | "height"> | null;
   onRetry: () => void;
 }
 
@@ -25,16 +32,34 @@ export function PreviewPanel({
   height,
   prompt,
   generationId,
+  generationParams,
   onRetry,
 }: Props) {
   const aspectRatio = `${width} / ${height}`;
+  const [resolution, setResolution] = useState<"1x" | "2x">("1x");
+  const [downloading, setDownloading] = useState(false);
 
-  const handleDownload = () => {
-    if (!imageUrl) return;
-    const a = document.createElement("a");
-    a.href = imageUrl;
-    a.download = `ai-design-${generationId ?? "image"}.png`;
-    a.click();
+  const templateId = generationParams?.templateId;
+
+  const handleDownload = async () => {
+    if (!imageUrl || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadImageWithResolution(imageUrl, templateId, resolution);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleMetadataDownload = () => {
+    if (!generationId || !generationParams) return;
+    downloadMetadataFromPreview({
+      generationId,
+      prompt,
+      width,
+      height,
+      ...generationParams,
+    });
   };
 
   const handleCopyPrompt = async () => {
@@ -103,20 +128,6 @@ export function PreviewPanel({
             {/* Action buttons */}
             <div className="absolute top-2 right-2 flex gap-2">
               <button
-                data-testid="preview-download-btn"
-                onClick={handleDownload}
-                aria-label="画像をダウンロード"
-                title="ダウンロード"
-                className="p-2 rounded text-sm transition-colors"
-                style={{
-                  backgroundColor: "rgba(26, 26, 31, 0.9)",
-                  color: "var(--color-text-primary)",
-                  border: "1px solid var(--color-border)",
-                }}
-              >
-                ↓
-              </button>
-              <button
                 data-testid="preview-copy-prompt-btn"
                 onClick={handleCopyPrompt}
                 aria-label="プロンプトをコピー"
@@ -182,6 +193,76 @@ export function PreviewPanel({
           </div>
         )}
       </div>
+
+      {/* Export controls — shown only when image is ready */}
+      {status === "complete" && imageUrl && (
+        <div
+          data-testid="preview-export-controls"
+          className="flex flex-wrap items-center gap-2 mt-3"
+        >
+          {/* Resolution selector */}
+          <div
+            className="flex rounded overflow-hidden"
+            style={{ border: "1px solid var(--color-border)" }}
+            role="group"
+            aria-label="解像度選択"
+          >
+            {(["1x", "2x"] as const).map((r) => (
+              <button
+                key={r}
+                data-testid={`resolution-${r}-btn`}
+                onClick={() => setResolution(r)}
+                aria-pressed={resolution === r}
+                className="px-3 py-1 text-xs transition-colors"
+                style={{
+                  backgroundColor: resolution === r ? "var(--color-accent)" : "var(--color-bg-elevated)",
+                  color: resolution === r ? "#fff" : "var(--color-text-secondary)",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {/* Download PNG */}
+          <button
+            data-testid="preview-download-btn"
+            onClick={handleDownload}
+            disabled={downloading}
+            aria-label={`PNG をダウンロード (${resolution})`}
+            className="px-3 py-1 rounded text-xs transition-colors"
+            style={{
+              backgroundColor: "var(--color-bg-elevated)",
+              color: "var(--color-text-primary)",
+              border: "1px solid var(--color-border)",
+              cursor: downloading ? "not-allowed" : "pointer",
+              opacity: downloading ? 0.6 : 1,
+            }}
+          >
+            {downloading ? "処理中..." : "↓ PNG保存"}
+          </button>
+
+          {/* Metadata JSON download */}
+          {generationId && generationParams && (
+            <button
+              data-testid="preview-metadata-btn"
+              onClick={handleMetadataDownload}
+              aria-label="メタデータをダウンロード"
+              className="px-3 py-1 rounded text-xs transition-colors"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                color: "var(--color-text-secondary)",
+                border: "1px solid var(--color-border)",
+                cursor: "pointer",
+              }}
+            >
+              ↓ メタデータ (JSON)
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

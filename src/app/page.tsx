@@ -250,6 +250,14 @@ function HomeContent() {
             height={height}
             prompt={prompt}
             generationId={state.generationId}
+            generationParams={{
+              workflow,
+              steps,
+              cfgScale: selectedTemplate?.cfgScale ?? (workflow === "sd15" ? 7.0 : 1.0),
+              seed: seed ? Number(seed) : 0,
+              templateId: selectedTemplate?.id,
+              negativePrompt: workflow === "sd15" ? negativePrompt : undefined,
+            }}
             onRetry={reset}
           />
         </div>

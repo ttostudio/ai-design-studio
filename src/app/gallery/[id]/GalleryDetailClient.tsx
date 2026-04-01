@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toggleFavorite } from "@/lib/api";
 import { SimilarDesigns } from "@/components/SimilarDesigns";
+import {
+  downloadImageWithResolution,
+  downloadMetadataFromGeneration,
+} from "@/lib/exportUtils";
 import type { Generation } from "@/lib/api";
 
 interface Props {
@@ -39,6 +43,8 @@ const TEMPLATE_LABELS: Record<string, string> = {
 export function GalleryDetailClient({ generation: gen, similar }: Props) {
   const router = useRouter();
   const [isFav, setIsFav] = useState(gen.is_favorite);
+  const [resolution, setResolution] = useState<"1x" | "2x">("1x");
+  const [downloading, setDownloading] = useState(false);
 
   const handleFavoriteToggle = async () => {
     const next = !isFav;
@@ -64,12 +70,18 @@ export function GalleryDetailClient({ generation: gen, similar }: Props) {
     router.push(`/?${params.toString()}`);
   };
 
-  const handleDownload = () => {
-    if (!gen.image_url) return;
-    const a = document.createElement("a");
-    a.href = gen.image_url;
-    a.download = `ai-design-${gen.id}.png`;
-    a.click();
+  const handleDownload = async () => {
+    if (!gen.image_url || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadImageWithResolution(gen.image_url, gen.template_id, resolution);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleMetadataDownload = () => {
+    downloadMetadataFromGeneration(gen);
   };
 
   const aspectRatio = `${gen.width} / ${gen.height}`;
@@ -248,18 +260,60 @@ export function GalleryDetailClient({ generation: gen, similar }: Props) {
             >
               再生成
             </button>
+            {/* Resolution selector */}
+            <div
+              className="flex rounded overflow-hidden"
+              style={{ border: "1px solid var(--color-border)" }}
+              role="group"
+              aria-label="解像度選択"
+            >
+              {(["1x", "2x"] as const).map((r) => (
+                <button
+                  key={r}
+                  data-testid={`detail-resolution-${r}-btn`}
+                  onClick={() => setResolution(r)}
+                  aria-pressed={resolution === r}
+                  className="flex-1 py-1 text-xs transition-colors"
+                  style={{
+                    backgroundColor: resolution === r ? "var(--color-accent)" : "var(--color-bg-elevated)",
+                    color: resolution === r ? "#fff" : "var(--color-text-secondary)",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
             <button
+              data-testid="detail-download-btn"
               onClick={handleDownload}
+              disabled={downloading}
               className="w-full py-2 px-4 rounded text-sm"
               style={{
                 backgroundColor: "var(--color-bg-elevated)",
                 color: "var(--color-text-primary)",
                 border: "1px solid var(--color-border)",
                 borderRadius: "var(--radius-sm)",
+                cursor: downloading ? "not-allowed" : "pointer",
+                opacity: downloading ? 0.6 : 1,
+              }}
+            >
+              {downloading ? "処理中..." : "↓ PNG保存"}
+            </button>
+            <button
+              data-testid="detail-metadata-btn"
+              onClick={handleMetadataDownload}
+              className="w-full py-2 px-4 rounded text-sm"
+              style={{
+                backgroundColor: "var(--color-bg-elevated)",
+                color: "var(--color-text-secondary)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-sm)",
                 cursor: "pointer",
               }}
             >
-              ダウンロード
+              ↓ メタデータ (JSON)
             </button>
           </div>
         </div>
