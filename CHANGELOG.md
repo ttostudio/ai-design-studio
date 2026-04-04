@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.2.0 (2026-04-04)
+
+### Changed
+- Next.js 14 → 16.2.2 にアップグレード
+- React 18 → 19.2.4 にアップグレード
+- `@types/react` / `@types/react-dom` を React 19 対応版に更新
+- `eslint-config-next` を 16.x に更新
+- `tsconfig.json` を Next.js 16 推奨設定に自動更新（`target: ES2017`, `jsx: react-jsx`）
+
+### Added
+- README.md（日本語）：プロジェクト概要・セットアップ・アーキテクチャ図を含む
+- `.env.example` に `NEXT_PUBLIC_API_BASE` を追記
+
 ## v0.1.0 (2026-03-28)
 
 ### 初回リリース
